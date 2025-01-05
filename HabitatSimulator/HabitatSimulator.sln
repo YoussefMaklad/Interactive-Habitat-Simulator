@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34202.233
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HabitatSimulator", "HabitatSimulator.csproj", "{2FD58B79-D4E8-4227-9685-CEF0A74476ED}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2FD58B79-D4E8-4227-9685-CEF0A74476ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FD58B79-D4E8-4227-9685-CEF0A74476ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FD58B79-D4E8-4227-9685-CEF0A74476ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FD58B79-D4E8-4227-9685-CEF0A74476ED}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {305A98B3-B7E8-41B6-BD2A-FD55B1B6392C}
+	EndGlobalSection
+EndGlobal
