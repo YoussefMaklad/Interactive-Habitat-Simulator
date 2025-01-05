@@ -26,7 +26,7 @@ def save_gaze_coordinates(looking_direction, x, y):
         writer = csv.writer(file)
         writer.writerow([looking_direction, x, y])
 
-def send_teacher_report(client_socket, db: sqlite3.Cursor):
+def send_teacher_report(client_socket: socket.socket, db: sqlite3.Cursor):
     def format_experiences(experiences):
         formatted_experiences = {}
         for user_id, average_emotion, username in experiences:
@@ -50,7 +50,7 @@ def send_teacher_report(client_socket, db: sqlite3.Cursor):
     except sqlite3.Error as e:
         print(f"Error fetching or sending teacher report: {e}")
 
-def authenticate_user(client_socket):
+def authenticate_user(client_socket: socket.socket):
     recognized_username = None
     user_id, username, role = None, None, None
     
@@ -158,7 +158,7 @@ def get_gaze_frame_and_save_looking_direction(frame):
     
     return gaze_frame, text        
 
-def recognize_and_send_gestures(frame, mp_results, client_socket):
+def recognize_and_send_gestures(frame, mp_results, client_socket: socket.socket):
     data_aux = []
     x_ = []
     y_ = []
