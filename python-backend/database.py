@@ -1,3 +1,4 @@
+from rich import print
 import sqlite3
 
 def connect_to_database():
@@ -66,6 +67,21 @@ def insert_known_users(db: sqlite3.Cursor, db_connection: sqlite3.Connection):
         print(f"Error inserting users: {e}") 
     finally:
         db_connection.close()
+
+def insert_new_user(name: str, image_path: str, mac: str = "", role: str = "Kid"):
+    db, db_connection = connect_to_database()
+    db.execute(
+                '''
+                INSERT INTO users (name, role, mac_address, image_path)
+                VALUES (?, ?, ?, ?)
+                ''',
+                (name, role, mac, image_path)
+            )
+
+    db_connection.commit()
+    db_connection.close()
+        
+    print(f"User: {name} inserted to db successfully.")
 
 if __name__ == "__main__":
     create_database()
