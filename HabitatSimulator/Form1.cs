@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -13,6 +13,7 @@ using System.Threading;
 using System.IO;
 using System.Media;
 using Newtonsoft.Json;
+using System.Runtime.InteropServices.ComTypes;
 
 public class Animal
 {
@@ -28,7 +29,8 @@ public class Habitat
 {
     public bool isActive = false;
     public string Name { get; set; }
-    public string BackgroundPath { get; set; }
+    public string LightBackgroundPath { get; set; }
+    public string DarkBackgroundPath { get; set; }
     public string FocusedImagePathInStartMenu { get; set; }
     public List<Animal> Animals { get; set; } = new List<Animal>();
 }
@@ -136,6 +138,11 @@ public class IdentityManager
     }
 }
 
+public enum Theme
+{
+    LIGHT,
+    DARK
+}
 
 namespace HabitatSimulator
 {
@@ -144,19 +151,24 @@ namespace HabitatSimulator
         private bool showInitialImage = true;
         private bool showErrorImage = false;
 
+        private Theme theme;
         private List<Habitat> habitats;
         private Animal currentAnimal = null;
         private Habitat currentHabitat = null;
         private CircularMenu circularMenu = null;
         private IdentityManager identityManager = new IdentityManager();
         private Dictionary<string, string> teacherReport = new Dictionary<string, string>();
+        private Dictionary<string, string> onScreenTeacherReport = new Dictionary<string, string>();
 
+        private string kidsReportType = "";
         private string chosenHabitat = "";
         private string chosenAnimal = "";
         private string chosenGesture = "";
         private bool showFocusedImageForChosenHabitat = false;
         private bool workingWithRotation = false;
-        private bool Habitat_Activation = false;
+        private bool HabitatActivation = false;
+        private int counterForPlaySoundCorrect = 0;
+        private int counterForPlaySoundWrong = 0;
 
         private TcpClient tcp_client;
         private NetworkStream _stream;
@@ -167,8 +179,15 @@ namespace HabitatSimulator
             InitializeComponent();
             InitializeWindow();
             InitializeEventHandlers();
+            InitializeTheme();
             InitializeUserIdentity();
             InitializeHabitatsAndAnimals();
+        }
+
+        private void InitializeTheme()
+        {
+            int currentHour = DateTime.Now.Hour;
+            theme = (currentHour >= 6 && currentHour < 17) ? Theme.LIGHT : Theme.DARK;
         }
 
         private void InitializeUserIdentity()
@@ -200,38 +219,41 @@ namespace HabitatSimulator
                 new Habitat
                 {
                     Name = "Home",
-                    BackgroundPath = "home.jpg",
+                    LightBackgroundPath = "home.jpg",
+                    DarkBackgroundPath = "HomeNight.png",
                     FocusedImagePathInStartMenu = "c-home.jpg",
                     Animals = new List<Animal>
                     {
-                        new Animal { Name = "dog",  ImagePath = "dog.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav" },
+                        new Animal { Name = "dog",  ImagePath = "dog.png", NameAudioFilePath = "sounds/dog-name.wav", DescriptionAudioFilePath = "sounds/dog-description.wav", HabitatAudioFilePath = "sounds/dog-habitat.wav", SoundAudioFilePath = "sounds/dog-sound.wav" },
                         new Animal { Name = "cat",  ImagePath = "cat.png", NameAudioFilePath = "sounds/cat-name.wav", DescriptionAudioFilePath = "sounds/cat-description.wav", HabitatAudioFilePath = "sounds/cat-habitat.wav", SoundAudioFilePath = "sounds/cat-sound.wav"},
-                        new Animal { Name = "bird", ImagePath = "bird.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav"}
+                        new Animal { Name = "bird", ImagePath = "bird.png", NameAudioFilePath = "sounds/bird-name.wav", DescriptionAudioFilePath = "sounds/bird-description.wav", HabitatAudioFilePath = "sounds/bird-habitat.wav", SoundAudioFilePath = "sounds/bird-sound.wav"}
                     }
                 },
                 new Habitat
                 {
                     Name = "WildLife",
-                    BackgroundPath = "wildlife.jpg",
+                    LightBackgroundPath = "wildlife.jpg",
+                    DarkBackgroundPath = "WildNight.png",
                     FocusedImagePathInStartMenu = "c-wildlife.jpg",
                     Animals = new List<Animal>
                     {
-                        new Animal { Name = "bear", ImagePath = "bear.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav" },
-                        new Animal { Name = "giraffe", ImagePath = "giraffe.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav"},
-                        new Animal { Name = "elephant", ImagePath = "elephant.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav"},
-                        new Animal { Name = "zebra", ImagePath = "zebra.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav"}
+                        new Animal { Name = "bear", ImagePath = "bear.png", NameAudioFilePath = "sounds/bear-name.wav", DescriptionAudioFilePath = "sounds/bear-description.wav", HabitatAudioFilePath = "sounds/bear-habitat.wav", SoundAudioFilePath = "sounds/bear-sound.wav" },
+                        new Animal { Name = "giraffe", ImagePath = "giraffe.png", NameAudioFilePath = "sounds/giraffe-name.wav", DescriptionAudioFilePath = "sounds/giraffe-description.wav", HabitatAudioFilePath = "sounds/giraffe-habitat.wav", SoundAudioFilePath = "sounds/giraffe-sound.wav"},
+                        new Animal { Name = "elephant", ImagePath = "elephant.png", NameAudioFilePath = "sounds/elephant-name.wav", DescriptionAudioFilePath = "sounds/elephant-description.wav", HabitatAudioFilePath = "sounds/elephant-habitat.wav", SoundAudioFilePath = "sounds/elephant-sound.wav"},
+                        new Animal { Name = "zebra", ImagePath = "zebra.png", NameAudioFilePath = "sounds/zebra-name.wav", DescriptionAudioFilePath = "sounds/zebra-description.wav", HabitatAudioFilePath = "sounds/zebra-habitat.wav", SoundAudioFilePath = "sounds/zebra-sound.wav"}
                     }
                 },
                 new Habitat
                 {
                     Name = "Farm",
-                    BackgroundPath = "farm.jpg",
+                    LightBackgroundPath = "farm.jpg",
+                    DarkBackgroundPath = "FarmNight.png",
                     FocusedImagePathInStartMenu = "c-farm.jpg",
                     Animals = new List<Animal>
                     {
-                        new Animal { Name = "sheep", ImagePath = "sheep.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav" },
-                        new Animal { Name = "cow", ImagePath = "cow.png", NameAudioFilePath = "sounds/cow-description.wav", DescriptionAudioFilePath = "sounds/cow-habitat.wav", HabitatAudioFilePath = "sounds/cow-name.wav", SoundAudioFilePath = "sounds/cow-sound.wav"},
-                        new Animal { Name = "horse", ImagePath = "horse.png", NameAudioFilePath = "sounds/bear-sound.wav", DescriptionAudioFilePath = "sounds/bear-sound.wav", HabitatAudioFilePath = "sounds/bear-sound.wav", SoundAudioFilePath = "sounds/bear-sound.wav"}
+                        new Animal { Name = "sheep", ImagePath = "sheep.png", NameAudioFilePath = "sounds/sheep-name.wav", DescriptionAudioFilePath = "sounds/sheep-description.wav", HabitatAudioFilePath = "sounds/sheep-habitat.wav", SoundAudioFilePath = "sounds/sheep-sound.wav" },
+                        new Animal { Name = "cow", ImagePath = "cow.png", NameAudioFilePath = "sounds/cow-name.wav", DescriptionAudioFilePath = "sounds/cow-description.wav", HabitatAudioFilePath = "sounds/cow-habitat.wav", SoundAudioFilePath = "sounds/cow-sound.wav"},
+                        new Animal { Name = "horse", ImagePath = "horse.png", NameAudioFilePath = "sounds/horse-name.wav", DescriptionAudioFilePath = "sounds/horse-description.wav", HabitatAudioFilePath = "sounds/horse-habitat.wav", SoundAudioFilePath = "sounds/horse-sound.wav"}
                     }
                 }
             };
@@ -289,9 +311,9 @@ namespace HabitatSimulator
                             if (message.Contains("Habitat") && currentHabitat == null)
                             {
 
-                                if (!Habitat_Activation)
+                                if (!HabitatActivation)
                                 {
-                                    Habitat_Activation = true;
+                                    HabitatActivation = true;
                                     chosenHabitat = message.Substring(8);
                                     if (showInitialImage)
                                     {
@@ -303,9 +325,8 @@ namespace HabitatSimulator
                             else if (message.Contains("Gesture"))
                             {
                                 chosenGesture = message.Substring(8);
-                                if (chosenGesture.Contains("MainMenu") && currentHabitat != null && currentAnimal != null)
+                                if (chosenGesture.Contains("Back") && currentHabitat != null && currentAnimal != null)
                                 {
-                                    //MessageBox.Show("reseting to initial main menu...");
                                     ResetToInitialState();
                                     Invalidate();
                                     Update();
@@ -330,18 +351,27 @@ namespace HabitatSimulator
                                     if (EnsureAnimalInCurrentHabitat(animalName))
                                     {
                                         chosenAnimal = animalName;
-                                        //string correctChoiceAudioPath = Path.Combine(Environment.CurrentDirectory, "sounds\\correct-choice.wav");
-                                        //PlaySound(correctChoiceAudioPath);
-                                    }
-                                    else
-                                    {
-                                        showErrorImage = true;
+                                        if(counterForPlaySoundCorrect == 0)
+                                        {
+                                            string correctChoiceAudioPath = Path.Combine(Environment.CurrentDirectory, "sounds\\correct-choice.wav");
+                                            PlaySound(correctChoiceAudioPath);
+                                            counterForPlaySoundCorrect++;
+                                        }
                                     }
                                     //else
                                     //{
-                                    //    string wrongChoiceAudioPath = Path.Combine(Environment.CurrentDirectory, "sounds\\wrong-choice.wav");
-                                    //    PlaySound(wrongChoiceAudioPath);
+                                    //    showErrorImage = true;
                                     //}
+                                    else
+                                    {
+                                        if (counterForPlaySoundWrong == 0)
+                                        {
+                                            string wrongChoiceAudioPath = Path.Combine(Environment.CurrentDirectory, "sounds\\wrong-choice.wav");
+                                            PlaySound(wrongChoiceAudioPath);
+                                            counterForPlaySoundWrong++;
+                                        }
+                                        showErrorImage = true;
+                                    }
                                 }
                             }
                             else if (message.Contains("Identity") && !identityManager.Equals(UserIdentity.NONE))
@@ -355,12 +385,32 @@ namespace HabitatSimulator
                                 }
                                 //ShowMessageBox("recived identity: " + identity);
                             }
-                            else if (message.Contains("TeacherReport") && identityManager.Equals(UserIdentity.TEACHER))
+                            else if (message.Contains("TeacherReport"))
                             {
-                                string jsonPayload = message.Substring(13);
+                                string jsonPayload = message.Replace("TeacherReport:", "").Trim();
                                 teacherReport = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonPayload);
-                                //ShowMessageBox(teacherReport.ToString());
                             }
+                            else if (message.Contains("ReportType"))
+                            {
+                                kidsReportType = message.Replace("ReportType:", "").Trim();
+
+                                onScreenTeacherReport.Clear();
+                                foreach (var entry in teacherReport)
+                                {
+                                    string name = entry.Key;
+                                    string mood = entry.Value.ToLower();
+                                    if ((kidsReportType == "HappyKids" && mood == "happy") ||
+                                        (kidsReportType == "SadKids" && mood == "sad") ||
+                                        (kidsReportType == "NeutralKids" && mood == "neutral") ||
+                                        (kidsReportType == "AngryKids" && mood == "angry") ||
+                                        (kidsReportType == "FearKids" && mood == "fear"))
+                                    {
+                                        onScreenTeacherReport[name] = mood;
+                                    }
+                                }
+                                Invalidate();
+                            }
+
                             Invalidate();
                         }
                     }
@@ -396,39 +446,35 @@ namespace HabitatSimulator
 
         private void DisplayTeacherReport(Graphics g)
         {
-            //if (teacherReport == null || teacherReport.Count == 0)
-            //    return;
+            if (onScreenTeacherReport == null || onScreenTeacherReport.Count == 0)
+                return;
 
             int midX = this.ClientSize.Width / 2;
-            int topPadding = 50;
-            int itemHeight = 30;
+            int topPadding = 300;
+            int itemHeight = 40;
+            int x = midX - 130;
+            int y = topPadding + itemHeight;
 
-            Font font = new Font("Arial", 30, FontStyle.Bold);
+            Font font = new Font("Arial", 40, FontStyle.Bold);
             Brush happyBrush = Brushes.Green;
             Brush sadBrush = Brushes.Red;
+            Brush angryBrush = Brushes.Red;
+            Brush neutralBrush = Brushes.Yellow;
+            Brush fearBrush = Brushes.Blue;
+            Brush currentBrush = null;
 
-            g.DrawString("Happy Children", font, happyBrush, new Point(50, topPadding));
-            g.DrawString("Sad Children", font, sadBrush, new Point(midX + 50, topPadding));
+            if (kidsReportType == "HappyKids") { g.DrawString("Happy Children", font, happyBrush, new Point(x, topPadding)); currentBrush = happyBrush; }
+            else if (kidsReportType == "SadKids") { g.DrawString("Sad Children", font, sadBrush, new Point(x, topPadding)); currentBrush = sadBrush; }
+            else if (kidsReportType == "AngryKids") { g.DrawString("Angry Children", font, angryBrush, new Point(x, topPadding)); currentBrush = angryBrush; }
+            else if (kidsReportType == "NeutralKids") { g.DrawString("Neutral Children", font, neutralBrush, new Point(x, topPadding)); currentBrush = neutralBrush; }
+            else if (kidsReportType == "FearKids") { g.DrawString("Scared Children", font, fearBrush, new Point(x, topPadding)); currentBrush = fearBrush; }
 
-            int sadY = topPadding;
-            int happyY = topPadding;
 
-            foreach (var entry in teacherReport)
+            foreach (var entry in onScreenTeacherReport)
             {
-                string name = entry.Key;
-                string mood = entry.Value.ToLower();
-
-                if (mood == "sad")
-                {
-                    g.DrawString(name, font, sadBrush, new Point(50, sadY));
-                    sadY += itemHeight;
-                }
-                else if (mood == "happy")
-                {
-                    g.DrawString(name, font, happyBrush, new Point(midX + 50, happyY));
-                    happyY += itemHeight;
-                }
-                Invalidate();
+                string kidName = entry.Key;
+                g.DrawString(kidName, font, currentBrush, new Point(x, y));
+                y += itemHeight;
             }
         }
 
@@ -476,14 +522,18 @@ namespace HabitatSimulator
                             string focusedImagePath = Path.Combine(Environment.CurrentDirectory, currentHabitat.FocusedImagePathInStartMenu);
                             DrawBackgroundImage(g, focusedImagePath);
 
-                            await Task.Delay(1500);
+                            await Task.Delay(2000);
 
                             showFocusedImageForChosenHabitat = false;
                             Invalidate();
                             return;
                         }
 
-                        string currentHabitatBackgroundPath = Path.Combine(Environment.CurrentDirectory, currentHabitat.BackgroundPath);
+                        string currentHabitatBackgroundPath = "";
+
+                        if (theme == Theme.LIGHT) currentHabitatBackgroundPath = Path.Combine(Environment.CurrentDirectory, currentHabitat.LightBackgroundPath);
+                        else currentHabitatBackgroundPath = Path.Combine(Environment.CurrentDirectory, currentHabitat.DarkBackgroundPath);
+
                         DrawBackgroundImage(g, currentHabitatBackgroundPath);
 
                         if (!string.IsNullOrEmpty(chosenAnimal))
@@ -511,7 +561,7 @@ namespace HabitatSimulator
             }
             else if (identityManager.CurrentIdentity == UserIdentity.TEACHER)
             {
-                string teacherImagePath = Path.Combine(Environment.CurrentDirectory, "teacher-report.jpg");
+                string teacherImagePath = Path.Combine(Environment.CurrentDirectory, "teacher-report-animals.png");
                 DrawBackgroundImage(g, teacherImagePath);
                 DisplayTeacherReport(g);
                 Invalidate();
@@ -519,7 +569,7 @@ namespace HabitatSimulator
             }
             else
             {
-                string authenticateImagePath = Path.Combine(Environment.CurrentDirectory, "authenticate.jpg");
+                string authenticateImagePath = Path.Combine(Environment.CurrentDirectory, "AUTH.png");
                 DrawBackgroundImage(g, authenticateImagePath);
             }
             Invalidate();
@@ -555,9 +605,11 @@ namespace HabitatSimulator
             showInitialImage = true;
             showErrorImage = false;
             workingWithRotation = false;
-            Habitat_Activation = false;
+            HabitatActivation = false;
 
             showFocusedImageForChosenHabitat = false;
+            counterForPlaySoundCorrect = 0;
+            counterForPlaySoundWrong = 0;
 
             foreach (Habitat habitat in habitats)
             {
