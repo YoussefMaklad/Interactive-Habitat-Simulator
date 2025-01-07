@@ -4,17 +4,53 @@ import socket
 import json
 import csv
 import numpy as np
+import matplotlib
 from rich import print
 from collections import Counter
 from threading import Thread
 from thread_with_return_value import ThreadWithReturn
 from face_recognization_funcs import detect_emotion, detect_face
-from database import connect_to_database, save_user_average_emotion_to_database
+from database import connect_to_database, save_user_average_emotion_to_database, insert_new_user
 from heatmap import generate_heatmap
+from encode import encode_all
 from constants import *
 import sqlite3
 import bluetooth_scan
 import cam
+
+matplotlib.use("agg")
+
+def register_new_user():
+    cap = cv2.VideoCapture(0)
+    while True:
+        ret, frame = cap.read()
+        frame = cv2.resize(frame, (480, 320))
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+        cv2.putText(frame, 'Ready? Press "Q" ! :)', (100, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3, cv2.LINE_AA)
+        cv2.imshow('frame', rgb)
+        if cv2.waitKey(25) == ord('q'):
+            break
+    
+    device = json.loads(bluetooth_scan.get_latest_connected_bluetooth_device())
+    
+    mac_address = device['device'][0]['address']
+    name = device['device'][0]['name']
+    image_path = f"./known-faces/{name}/{name}.jpg"
+    
+    insert_new_user(name, image_path, mac_address, "Kid")
+    
+    cv2.imwrite(image_path, rgb) 
+    cap.release()
+    cv2.destroyAllWindows()
+    
+    encode_all()
+    
+    return name
+
+def set_proper_labels_according_to_user_role(role):
+    global labels_dict
+    labels_dict = labels_dict_kid if role == "Kid" else labels_dict_teacher
 
 def initialize_gaze_coordinates_csv():
     with open(CSV_FILE, mode='w', newline='') as file:
@@ -60,11 +96,16 @@ def authenticate_user(client_socket: socket.socket):
         face_recognition_thread.start()
         result = face_recognition_thread.join()
         
-        if "can't" not in result:
+        if "can't identify" not in result:
             recognized_username = result
             print(f"Detected user: {recognized_username}")
         else:
-            print(result)    
+            print(result)
+            # print("registrating a new user...")
+            # new_user_name = register_new_user()
+            # recognized_username = new_user_name
+            # print(f"user: {new_user_name} has been registered successfully!!!")
+              
 
     db, db_connection = connect_to_database()
     
@@ -92,11 +133,9 @@ def authenticate_user(client_socket: socket.socket):
                     send_teacher_report(client_socket, db)
                 
                 if role == "Kid":
-                    KID_ID = user_id
-                    print(f"Kid ID: {KID_ID}")
+                    print(f"Kid ID: {user_id}")
                     print(f"Kid Name: {name}")
-                    print(f"ROLE is set to Kid")
-                    
+                                        
                 db_connection.close()    
                 return user_id, username, role
             
@@ -126,7 +165,8 @@ def recognize_and_send_animals(frame, client_socket: socket.socket):
             #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             try:
                 client_socket.send(f"Animal:{label}\n".encode('utf-8'))
-                print(f"Sent object: {label} to C# client.")
+                print(f"Sent Animal: {label} to C# client.")
+                time.sleep(2.5)
             except Exception as e:
                 print("Error sending object data to C# client:", e)
                 break
@@ -189,24 +229,24 @@ def recognize_and_send_gestures(frame, mp_results, client_socket: socket.socket)
                 data_aux.append(x - min(x_))
                 data_aux.append(y - min(y_))
 
-        x1 = int(min(x_) * W) - 10
-        y1 = int(min(y_) * H) - 10
-
-        x2 = int(max(x_) * W) - 10
-        y2 = int(max(y_) * H) - 10
-
         prediction = model.predict([np.asarray(data_aux)])
         predicted_character = labels_dict[int(prediction[0])]
         
-        if predicted_character in ["Rotate", "Select"]:
+        if predicted_character in ["Rotate", "Select", "Back"]:
             client_socket.send(f"Gesture:{predicted_character}\n".encode('utf-8'))
             print(f"Sent Gesture: {predicted_character} to C# client.")
             
         elif predicted_character in ["Farm", "WildLife", "Home"]:
             client_socket.send(f"Habitat:{predicted_character}\n".encode('utf-8'))
-            print(f"Sent Habitat: {predicted_character} to C# client.")    
+            print(f"Sent Habitat: {predicted_character} to C# client.")
+            
+        elif predicted_character in ["HappyKids", "SadKids", "NeutralKids", "AngryKids", "FearKids"]:
+            client_socket.send(f"ReportType:{predicted_character}\n".encode('utf-8'))
+            print(f"Sent ReportType: {predicted_character} to C# client.")
+            
+    time.sleep(2)          
         
-def main_loop(client_socket: socket.socket):
+def main_loop(client_socket: socket.socket, role):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
     while cap.isOpened():
@@ -216,7 +256,6 @@ def main_loop(client_socket: socket.socket):
             break
 
         frame = cv2.resize(frame, (480, 320))
-        gaze_frame, looking_direction = get_gaze_frame_and_save_looking_direction(frame)    
         
         try:
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -225,11 +264,14 @@ def main_loop(client_socket: socket.socket):
             if results.multi_hand_landmarks:
                 recognize_and_send_gestures(rgb_frame, results, client_socket)
             
-            recognize_and_send_animals(frame, client_socket)        
-            recognize_emotions(frame)
-              
-            cv2.putText(gaze_frame, looking_direction, (90, 60), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147, 58, 31), 2)
-            cv2.imshow("Server Frame", gaze_frame)
+            if role == "Kid":
+                gaze_frame, looking_direction = get_gaze_frame_and_save_looking_direction(frame)    
+                recognize_and_send_animals(frame, client_socket)        
+                recognize_emotions(frame)
+                cv2.putText(gaze_frame, looking_direction, (90, 60), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147, 58, 31), 2)
+                cv2.imshow("Server Frame", gaze_frame)
+            else:
+                cv2.imshow("Server Frame", rgb_frame)    
 
         except Exception as e:
             print(f"Error: {e}")
@@ -240,7 +282,6 @@ def main_loop(client_socket: socket.socket):
     cap.release()
     cv2.destroyAllWindows()
 
-
 def start_socket_server(host='localhost', port=5000):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
@@ -250,13 +291,13 @@ def start_socket_server(host='localhost', port=5000):
     print(f"Connected to C# client at {address}")
     return client_socket, server_socket
 
-
 def main_socket_thread():
     initialize_gaze_coordinates_csv()
     client_socket, server_socket = start_socket_server()
     user_id, username, role = authenticate_user(client_socket)
-    time.sleep(2)
-    main_loop(client_socket)
+    set_proper_labels_according_to_user_role(role)
+    
+    main_loop(client_socket, role)
     
     if role == "Kid":
         print(f"saving to db average emotion of {Counter(emotion_buffer).most_common(1)[0][0]} for the user: {username}, with role of {role} ....")
